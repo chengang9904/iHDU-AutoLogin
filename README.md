@@ -45,6 +45,24 @@ WantedBy=multi-user.target
 ### 3. 查看状态
 ```systemctl status ihdu-login```
 
+## DNS 故障处理
+
+如果 Windows 使用普通 DNS 查询时提示 `No address (A) records available`，可以对比下面两条命令：
+
+```powershell
+Resolve-DnsName login.hdu.edu.cn -Type A -Server 210.32.32.1 -DnsOnly
+Resolve-DnsName login.hdu.edu.cn -Type A -Server 210.32.32.1 -DnsOnly -TcpOnly
+```
+
+脚本会先使用系统 DNS；失败时自动通过 `210.32.32.1` 的 DNS/TCP 查询门户地址，并在保持原域名 SNI 和证书校验的前提下连接解析出的 IP。可通过环境变量覆盖 DNS 服务器：
+
+```powershell
+$env:IHDU_DNS_SERVER = "210.32.32.1"
+python login.py
+```
+
+如果路由器直接查询上游 DNS 能返回校园网私有地址，但 LAN 设备或路由器本机 DNS 无法返回，通常需要检查路由器上的 DNS 劫持规则和 DNS 重绑定保护。建议只把 `login.hdu.edu.cn`、`portal.hdu.edu.cn` 加入重绑定保护白名单，不要全局关闭该保护。路由器设置变更后，再让 LAN 设备使用路由器地址作为 DNS。
+
 ## License
 
 MIT License
