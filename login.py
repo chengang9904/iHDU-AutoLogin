@@ -12,6 +12,8 @@ from time import sleep, time
 from urllib.parse import urlsplit, urlunsplit
 
 from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.triggers.combining import OrTrigger
+from apscheduler.triggers.cron import CronTrigger
 from loguru import logger
 from requests import Response, Session
 from requests.adapters import HTTPAdapter
@@ -37,6 +39,14 @@ PORTAL_HOSTS = (
 DNS_SERVER = getenv("IHDU_DNS_SERVER", "210.32.32.1")
 REQUEST_TIMEOUT = (4, 8)
 MAX_AC_ID = 10
+# Schedule times are Beijing time; the host clock may be set to another zone.
+SCHEDULE_TIMEZONE = "Asia/Shanghai"
+REFRESH_INTERVAL_DAYS = 3
+# The portal applies a logout about 10 seconds after the request.
+LOGOUT_SETTLE_SECONDS = 30
+CHECK_INTERVAL_MINUTES = 3
+# The gateway often forces users offline between 01:00 and 02:00.
+BUSY_CHECK_INTERVAL_SECONDS = 30
 
 auths = []
 
@@ -426,6 +436,8 @@ def refresh() -> None:
         auth = choice(auths)
         manager = Manager(auth["username"], auth["password"])
         manager.logout()
+        logger.debug(f"Waiting {LOGOUT_SETTLE_SECONDS}s for logout to take effect...")
+        sleep(LOGOUT_SETTLE_SECONDS)
         _login_with_available_account(manager)
     except (PortalUnavailableError, RequestException, OSError, ValueError) as exc:
         logger.error(f"Refresh deferred: {exc}")
@@ -477,11 +489,29 @@ def main() -> None:
         logger.error(f"{exc}, please check auth.json")
         return
     scheduler = BlockingScheduler()
-    scheduler.add_job(refresh, "interval", hours=6, coalesce=True, max_instances=1)
+    scheduler.add_job(
+        refresh,
+        "interval",
+        days=REFRESH_INTERVAL_DAYS,
+        coalesce=True,
+        max_instances=1,
+    )
+    # Every 3 minutes, except every 30 seconds from 01:00 to 02:00.
+    check_trigger = OrTrigger([
+        CronTrigger(
+            hour="0,2-23",
+            minute=f"*/{CHECK_INTERVAL_MINUTES}",
+            timezone=SCHEDULE_TIMEZONE,
+        ),
+        CronTrigger(
+            hour=1,
+            second=f"*/{BUSY_CHECK_INTERVAL_SECONDS}",
+            timezone=SCHEDULE_TIMEZONE,
+        ),
+    ])
     scheduler.add_job(
         check,
-        "interval",
-        seconds=30,
+        check_trigger,
         next_run_time=datetime.now(),
         coalesce=True,
         max_instances=1,

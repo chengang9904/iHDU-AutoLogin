@@ -4,3 +4,4 @@ venv/
 
 *.log
 auth.json
+clash.config
