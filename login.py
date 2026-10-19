@@ -1,6 +1,6 @@
 import socket
 import struct
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from hashlib import sha1
 from json import JSONDecodeError, dumps, load, loads
 from os import getenv
@@ -41,12 +41,16 @@ REQUEST_TIMEOUT = (4, 8)
 MAX_AC_ID = 10
 # Schedule times are Beijing time; the host clock may be set to another zone.
 SCHEDULE_TIMEZONE = "Asia/Shanghai"
+# Beijing has no daylight saving time, so a fixed offset is exact.
+LOG_TIMEZONE = timezone(timedelta(hours=8))
 REFRESH_INTERVAL_DAYS = 3
 # The portal applies a logout about 10 seconds after the request.
 LOGOUT_SETTLE_SECONDS = 30
 CHECK_INTERVAL_MINUTES = 3
 # The gateway often forces users offline between 01:00 and 02:00.
 BUSY_CHECK_INTERVAL_SECONDS = 30
+# Start a new log file every day at midnight and delete files older than this.
+LOG_RETENTION = "14 days"
 
 auths = []
 
@@ -475,8 +479,11 @@ def _load_auths(path: str = "auth.json") -> list[dict]:
 def main() -> None:
     global auths
     logger.remove()
+    logger.configure(
+        patcher=lambda record: record.update(time=record["time"].astimezone(LOG_TIMEZONE))
+    )
     logger.add(
-        "srun_login.log", rotation="10 MB", level="DEBUG",
+        "srun_login.log", rotation="00:00", retention=LOG_RETENTION, level="DEBUG",
         format="<g>{time:MM-DD HH:mm:ss}</g> [<lvl>{level}</lvl>] <c><u>srun_login</u></c> | {message}"
     )
     logger.add(
