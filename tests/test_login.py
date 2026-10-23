@@ -89,6 +89,21 @@ class LoginHelpersTest(unittest.TestCase):
         self.assertNotIn("Host", request.headers)
         self.assertEqual(response.url, "https://login.hdu.edu.cn/status")
 
+    def _scheduled_jobs(self, refresh_interval_days):
+        with patch.object(login, "REFRESH_INTERVAL_DAYS", refresh_interval_days), patch.object(
+            login, "_load_auths", return_value=[{"username": "u", "password": "p"}]
+        ), patch.object(login, "logger"), patch.object(
+            login, "BlockingScheduler"
+        ) as scheduler_class:
+            login.main()
+        return [call.args[0] for call in scheduler_class.return_value.add_job.call_args_list]
+
+    def test_main_schedules_refresh_by_default(self):
+        self.assertEqual(self._scheduled_jobs(3), [login.refresh, login.check])
+
+    def test_main_skips_refresh_when_disabled(self):
+        self.assertEqual(self._scheduled_jobs(0), [login.check])
+
 
 if __name__ == "__main__":
     unittest.main()

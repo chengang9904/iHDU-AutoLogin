@@ -42,7 +42,7 @@ Forked from [JBNRZ/srun-login](https://github.com/JBNRZ/srun-login)
 |---|---|---|
 | `CHECK_INTERVAL_MINUTES` | `3` | 平时的检测间隔（分钟） |
 | `BUSY_CHECK_INTERVAL_SECONDS` | `30` | 01:00–02:00 的检测间隔（秒） |
-| `REFRESH_INTERVAL_DAYS` | `3` | 主动下线并重新登录的间隔（天），从进程启动时开始计时 |
+| `REFRESH_INTERVAL_DAYS` | `3` | 主动下线并重新登录的间隔（天），从进程启动时开始计时；可用环境变量 `IHDU_REFRESH_INTERVAL_DAYS` 覆盖，设为 `0` 则不主动下线 |
 | `LOGOUT_SETTLE_SECONDS` | `30` | 主动下线后等待多久再登录（秒），应大于门户的 10 秒注销延迟 |
 | `SCHEDULE_TIMEZONE` | `"Asia/Shanghai"` | 检测时间表使用的时区 |
 | `LOG_TIMEZONE` | UTC+8 | 日志时间使用的时区 |
@@ -194,6 +194,12 @@ RestartSec=10
 
 [Install]
 WantedBy=multi-user.target
+```
+
+如果不需要主动下线（例如同一会话已有其他设备负责主动下线），在 `[Service]` 中加入：
+
+```ini
+Environment=IHDU_REFRESH_INTERVAL_DAYS=0
 ```
 
 ### 2. 启动服务

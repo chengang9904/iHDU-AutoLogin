@@ -43,7 +43,8 @@ MAX_AC_ID = 10
 SCHEDULE_TIMEZONE = "Asia/Shanghai"
 # Beijing has no daylight saving time, so a fixed offset is exact.
 LOG_TIMEZONE = timezone(timedelta(hours=8))
-REFRESH_INTERVAL_DAYS = 3
+# Set IHDU_REFRESH_INTERVAL_DAYS=0 to disable the scheduled logout and re-login.
+REFRESH_INTERVAL_DAYS = int(getenv("IHDU_REFRESH_INTERVAL_DAYS") or 3)
 # The portal applies a logout about 10 seconds after the request.
 LOGOUT_SETTLE_SECONDS = 30
 CHECK_INTERVAL_MINUTES = 3
@@ -496,13 +497,16 @@ def main() -> None:
         logger.error(f"{exc}, please check auth.json")
         return
     scheduler = BlockingScheduler()
-    scheduler.add_job(
-        refresh,
-        "interval",
-        days=REFRESH_INTERVAL_DAYS,
-        coalesce=True,
-        max_instances=1,
-    )
+    if REFRESH_INTERVAL_DAYS > 0:
+        scheduler.add_job(
+            refresh,
+            "interval",
+            days=REFRESH_INTERVAL_DAYS,
+            coalesce=True,
+            max_instances=1,
+        )
+    else:
+        logger.info("Scheduled refresh disabled")
     # Every 3 minutes, except every 30 seconds from 01:00 to 02:00.
     check_trigger = OrTrigger([
         CronTrigger(
